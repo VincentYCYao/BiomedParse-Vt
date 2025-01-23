@@ -32,6 +32,7 @@ infinibatch==0.1.1
 open-clip-torch==2.26.1
 git+https://github.com/MaureenZOU/detectron2-xyz.git
 matplotlib==3.9.4
+#timm==0.4.12
 #gradio==3.42.0
 #torch==2.3.1 #2.0.1 
 #torchvision==0.15.2 
