@@ -120,3 +120,7 @@ output
 #biomedparse_eval_results.json
 
 .amlignore*
+
+
+# <<< added by vincent
+Results_inference
