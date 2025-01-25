@@ -5,6 +5,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import cv2
 from PIL import Image
 from huggingface_hub import hf_hub_download
 
@@ -54,16 +55,16 @@ datafolder = "/mnt/vincent-pvc/Datasets/BiomedParseData"
 # ======
 
 split = "test"
-metric_dice = {}
+
 
 for dataset in datasets:
-    metric_dice[dataset] = {}
+    metric_dice = {}
     with open(os.path.join(datafolder, dataset, split + ".json"), "r") as f:
         datajson = json.load(f)
 
     # output folder
     outfolder_root = "/mnt/vincent-pvc/BiomedParse-Vt/Results_inference"
-    out_folder = os.path.join(outfolder_root, dataset)
+    out_folder = os.path.join(outfolder_root, 'figure', dataset)
     os.makedirs(out_folder, exist_ok=True)
 
     # List of images
@@ -94,8 +95,8 @@ for dataset in datasets:
         num_pixels = data["area"]
         mask_file = data["mask_file"]
         img_file = data["file_name"]
-        prompt = data["sentences"][0]["sent"]
-        prompts = [prompt]
+
+        prompts = [p["sent"] for p in data["sentences"]]
 
         # RGB image input of shape (H, W, 3). Currently only batch size 1 is supported.
         image = Image.open(os.path.join(datafolder, dataset, split, img_file))
@@ -132,6 +133,28 @@ for dataset in datasets:
                 ).astype(np.uint8)
             return Image.fromarray(overlay)
 
+
+        def overlay_contours(image, masks, colors, thickness=2):
+            # Make a copy of the input image
+            overlay = image.copy()
+
+            # Ensure the image is in uint8 format
+            overlay = np.array(overlay, dtype=np.uint8)
+
+            # Iterate over each mask and corresponding color
+            for index, (mask, color) in enumerate(zip(masks, colors)):
+                # Find contours of the mask
+                contours, _ = cv2.findContours(
+                    mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
+
+                # Draw all contours for this mask on the overlay
+                for contour in contours:
+                    cv2.drawContours(overlay, [contour], -1, color, thickness)
+
+            # Convert to PIL Image for consistency with your original function
+            return Image.fromarray(overlay)
+
         def generate_colors(n):
             cmap = plt.get_cmap("tab10")
             colors = [tuple(int(255 * val) for val in cmap(i)[:3]) for i in range(n)]
@@ -139,11 +162,11 @@ for dataset in datasets:
 
         colors = generate_colors(len(prompts))
 
-        pred_overlay = overlay_masks(
+        pred_overlay = overlay_contours(
             image, [1 * (pred_mask[i] > 0.5) for i in range(len(prompts))], colors
         )
 
-        gt_overlay = overlay_masks(image, gt_masks, colors)
+        gt_overlay = overlay_contours(image, gt_masks, colors)
 
         legend_patches = [
             mpatches.Patch(color=np.array(color) / 255, label=prompt)
@@ -169,11 +192,13 @@ for dataset in datasets:
         plt.savefig(os.path.join(out_folder, img_file))
         plt.close(fig)
 
-        metric_dice[dataset]["mask_file"] = mask_file
-        metric_dice[dataset]["img_file"] = img_file
-        metric_dice[dataset]["prompt"] = prompt
-        metric_dice[dataset]["dice"] = dice
+        metric_dice["mask_file"] = mask_file
+        metric_dice["img_file"] = img_file
+        metric_dice["prompt"] = prompt
+        metric_dice["dice"] = dice
 
-# Write dictionary to JSON file
-with open(os.path.join(outfolder_root, "metric_dice.json"), "w") as file:
-    json.dump(metric_dice, file, indent=4)
+    # Write dictionary to JSON file
+    json_folder = os.path.join(outfolder_root, 'metric', dataset)
+    os.makedirs(json_folder, exist_ok=True)
+    with open(os.path.join(json_folder, "dice.json"), "w") as file:
+        json.dump(metric_dice, file, indent=4)
