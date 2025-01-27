@@ -103,8 +103,10 @@ for dataset in datasets:
 
     # output folder
     outfolder_root = "/mnt/vincent-pvc/BiomedParse-Vt/Results_inference"
-    out_folder = os.path.join(outfolder_root, "figure", dataset)
-    os.makedirs(out_folder, exist_ok=True)
+    out_fig_folder = os.path.join(outfolder_root, "figure", dataset)
+    out_mask_folder = os.path.join(outfolder_root, "mask", dataset)
+    os.makedirs(out_fig_folder, exist_ok=True)
+    os.makedirs(out_mask_folder, exist_ok=True)
 
     # List of images
     datalist = datajson["annotations"]
@@ -194,8 +196,14 @@ for dataset in datasets:
         axes[2].legend(handles=legend_patches, loc="upper right", fontsize="small")
 
         plt.tight_layout()
-        plt.savefig(os.path.join(out_folder, img_file))
+        plt.savefig(os.path.join(out_fig_folder, img_file))
         plt.close(fig)
+
+        # save the mask
+        pred_mask_file = os.path.join(out_mask_folder, img_file)
+        # Image.fromarray((np.squeeze(pred_mask) > 0.5)).astype(np.uint8).save(pred_mask_file)
+        # Ensure the array is converted to uint8 before creating the image
+        Image.fromarray(((np.squeeze(pred_mask) > 0.5) * 255).astype(np.uint8)).save(pred_mask_file)
 
         metric_dice["DSC"][i_data]["mask_file"] = mask_file
         metric_dice["DSC"][i_data]["img_file"] = img_file
